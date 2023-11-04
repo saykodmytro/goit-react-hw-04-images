@@ -24,17 +24,20 @@ const App = () => {
     if (searchQuery === '') {
       toast.error('Sorry, there are no images matching your search query.');
       return;
-    }
-    setQuery(searchQuery);
+    } else setQuery(searchQuery);
     setPage(1);
     setImages([]);
+    if (searchQuery === query) {
+      toast.error('Please enter a new search.');
+      setBtnLoadMore(false);
+    }
+
     form.reset();
   };
 
   useEffect(() => {
     if (!query) return;
-
-    const fetchImages = async () => {
+    async function fetchImages() {
       try {
         setLoading(true);
         const resp = await fetchPhotos(query, page);
@@ -64,8 +67,7 @@ const App = () => {
       } finally {
         setLoading(false);
       }
-    };
-
+    }
     fetchImages();
   }, [query, page]);
 
