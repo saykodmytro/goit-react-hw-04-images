@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import React, { useEffect, useState } from 'react';
 import ImageGallery from './ImageGallery/ImageGallery';
 import toast, { Toaster } from 'react-hot-toast';
 import Searchbar from './Searchbar/Searchbar';
@@ -8,41 +8,36 @@ import Loader from './Loader/Loader';
 import Button from './Button/Button';
 import Modal from './Modal/Modal';
 
-export default class App extends Component {
-  state = {
-    query: '',
-    page: 1,
-    images: [],
-    loading: false,
-    error: false,
-    perPage: 12,
-    btnLoadMore: false,
-    isOpenModal: false,
-    modalData: null,
-  };
+const App = () => {
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [btnLoadMore, setBtnLoadMore] = useState(false);
+  const [isOpenModal, setIsOpenModal] = useState(false);
+  const [modalData, setModalData] = useState(null);
 
-  handleSearch = e => {
+  const handleSearch = e => {
     e.preventDefault();
     const form = e.currentTarget;
-    const query = form.search.value.trim().toLowerCase();
-    if (query === '') {
+    const searchQuery = form.search.value.trim().toLowerCase();
+    if (searchQuery === '') {
       toast.error('Sorry, there are no images matching your search query.');
       return;
     }
-    this.setState({ query: query, page: 1, images: null });
+    setQuery(searchQuery);
+    setPage(1);
+    setImages([]);
     form.reset();
   };
 
-  async componentDidUpdate(_, prevState) {
-    if (
-      prevState.query !== this.state.query ||
-      prevState.page !== this.state.page
-    ) {
-      try {
-        this.setState({ loading: true });
-        const { query, page } = this.state;
-        const resp = await fetchPhotos(query, page);
+  useEffect(() => {
+    if (!query) return;
 
+    const fetchImages = async () => {
+      try {
+        setLoading(true);
+        const resp = await fetchPhotos(query, page);
         const newImages = resp.hits.map(
           ({ id, webformatURL, largeImageURL, tags }) => ({
             id,
@@ -51,72 +46,63 @@ export default class App extends Component {
             tags,
           })
         );
-        this.setState(prevState => ({
-          images: [...(prevState.images || []), ...newImages],
-        }));
+        setImages(prevImages => [...prevImages, ...newImages]);
 
-        if (resp.totalHits !== 0 && this.state.page === 1) {
+        if (resp.totalHits !== 0 && page === 1) {
           toast.success(`Hooray! We found ${resp.totalHits} images!`);
         }
-        const totalPage = Math.ceil(resp.totalHits / this.state.perPage);
+        const totalPage = Math.ceil(resp.totalHits / 12);
 
         if (totalPage > page) {
-          this.setState({ btnLoadMore: true });
+          setBtnLoadMore(true);
         } else if (totalPage === page && resp.totalHits) {
           toast.error("Sorry, but you've reached the end of search results.");
-          this.setState({ btnLoadMore: false });
+          setBtnLoadMore(false);
         }
       } catch (error) {
         toast.error(error.message);
       } finally {
-        this.setState({ loading: false });
+        setLoading(false);
       }
-    }
-  }
+    };
 
-  handleLoadMore = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
+    fetchImages();
+  }, [query, page]);
+
+  const handleLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  openModal = someDataToModal => {
-    this.setState({
-      isOpenModal: true,
-      modalData: someDataToModal,
-    });
+  const openModal = someDataToModal => {
+    setIsOpenModal(true);
+    setModalData(someDataToModal);
   };
 
-  closeModal = () => {
-    this.setState({
-      isOpenModal: false,
-      modalData: null,
-    });
+  const closeModal = () => {
+    setIsOpenModal(false);
+    setModalData(null);
   };
 
-  render() {
-    const { images, loading } = this.state;
+  return (
+    <div className={css.app}>
+      <Searchbar onSubmit={handleSearch} />
+      {loading && <Loader />}
 
-    return (
-      <div className={css.app}>
-        <Searchbar onSubmit={this.handleSearch} />
-        {loading && <Loader />}
+      {images.length > 0 && (
+        <ImageGallery images={images} openModal={openModal} />
+      )}
+      {btnLoadMore && <Button onClick={handleLoadMore} />}
+      <Toaster
+        autoClose={3000}
+        position="top-right"
+        containerClassName="text-base"
+      />
 
-        {images && images.length > 0 && (
-          <ImageGallery images={images} openModal={this.openModal} />
-        )}
-        {this.state.btnLoadMore && <Button onClick={this.handleLoadMore} />}
-        <Toaster
-          autoClose={3000}
-          position="top-right"
-          containerClassName="text-base"
-        />
+      {(modalData !== null || isOpenModal) && (
+        <Modal closeModal={closeModal} modalData={modalData} />
+      )}
+    </div>
+  );
+};
 
-        {this.state.modalData !== null && (
-          <Modal
-            closeModal={this.closeModal}
-            modalData={this.state.modalData}
-          />
-        )}
-      </div>
-    );
-  }
-}
+export default App;
